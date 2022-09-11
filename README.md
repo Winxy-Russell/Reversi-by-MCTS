@@ -1,0 +1,2 @@
+# Reversi by MCTS
+ 
