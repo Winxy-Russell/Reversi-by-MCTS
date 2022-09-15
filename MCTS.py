@@ -33,32 +33,30 @@ class MCTS(object):
             self.node["cnt_total"] = 0
             self.state_nodes.append(self.node)
 
-        self.closure = [] # array to store the positions of the fixed points
+        self.closure = []  # array to store the positions of the fixed points
+        self.closure_supposed = []
         self.closure.append(self.from2Dto1D(4, 4))
         self.closure.append(self.from2Dto1D(3, 4))
         self.closure.append(self.from2Dto1D(4, 3))
         self.closure.append(self.from2Dto1D(3, 3))
         self.simulation_path = [[], [], []]
-        self.update_next_step(self.arr)
+        self.update_next_step(self.arr, self.closure)
 
-
-    def update_next_step(self, arr):
+    def update_next_step(self, arr, closure):
         self.next_step_black.clear()
         self.next_step_white.clear()
 
-        for closed_node in self.closure:
+        for closed_node in closure:
             tmp = {1, -1, 8, -8, 7, -7, 9, -9}
             for j in tmp:
                 new_node = closed_node + j
 
                 if 0 <= new_node < 64 and arr[new_node] == self.NULL:
-                    if self.cur_player == self.BLACK and self.check_step_valid(new_node, self.BLACK):
+                    if self.cur_player == self.BLACK and self.check_step_valid(arr, new_node, self.BLACK):
                         self.next_step_black.add(new_node)
 
-                    if self.cur_player == self.WHITE and self.check_step_valid(new_node, self.WHITE):
+                    if self.cur_player == self.WHITE and self.check_step_valid(arr, new_node, self.WHITE):
                         self.next_step_white.add(new_node)
-        # print("Black: ", self.next_step_black)
-        # print("White: ", self.next_step_white)
 
     def from2Dto1D(self, row, col):  # both row and col belong to [0, 8)
         return row * 8 + col
@@ -68,17 +66,18 @@ class MCTS(object):
         col = node % 8
         return [row, col]
 
-    def change_configurtion(self, cur_pos, arr): # The position given by cur_pos has to be valid.
+    def change_configurtion(self, cur_pos, arr, closure): # The position given by cur_pos has to be valid.
         # cur_pos = self.from2Dto1D(row, col)
         [row, col] = self.from1Dto2D(cur_pos)
+        # print("Col: ", col)
         p = cur_pos
         can_flip = False
         valid_step = False
         # horizontal
         for i in range(1, 8 - col):
-            if arr[p + i] == 0:
+            if arr[p + i] == self.NULL:
                 break
-            if arr[p + i] == self.cur_player:
+            elif arr[p + i] == self.cur_player:
                 if i != 1:
                     can_flip = True
                     valid_step = True
@@ -89,31 +88,33 @@ class MCTS(object):
                     break
                 arr[p + i] = self.cur_player
             can_flip = False
-        for i in range(1, col):
-            if arr[p - i] == 0:
+        for i in range(1, col + 1):
+            if arr[p - i] == self.NULL:
                 break
-            if arr[p - i] == self.cur_player:
+            elif arr[p - i] == self.cur_player:
                 if i != 1:
                     can_flip = True
                     valid_step = True
                 break
         if can_flip:
-            for i in range(1, col):
+            for i in range(1, col + 1):
                 if arr[p - i] == self.cur_player:
                     break
-                arr[p + i] = self.cur_player
+                arr[p - i] = self.cur_player
             can_flip = False
 
         #vertical, diagnoal
         for slide in range(7, 10):
+            p = cur_pos
             while p + slide < 64:
                 p += slide
-                if arr[p] == 0:
+                if arr[p] == self.NULL:
                     break
                 elif arr[p] == self.cur_player:
                     if p - cur_pos != slide:
                         valid_step = True
                         can_flip = True
+
             if can_flip:
                 p = cur_pos
                 while p + slide < 64:
@@ -123,9 +124,10 @@ class MCTS(object):
                     arr[p] = self.cur_player
                 can_flip = False
 
+            p = cur_pos
             while p - slide >= 0:
                 p -= slide
-                if arr[p] == 0:
+                if arr[p] == self.NULL:
                     break
                 elif arr[p] == self.cur_player:
                     if cur_pos - p != slide:
@@ -142,16 +144,22 @@ class MCTS(object):
         if valid_step:
             arr[cur_pos] = self.cur_player
             self.cur_player = 3 - self.cur_player
+            closure.append(cur_pos)
         return valid_step
 
     def run(self):
         l = self.selection(self.cur_player)
         self.expansion(random.choice(l), self.cur_player)
+        # print("Before simulation: \n")
+        # self.showBoard(8, self.arr_supposed)
+        # print()
         for i in range(1000):
+            # print(i)
             self.simulation_path[self.BLACK].clear()
             self.simulation_path[self.WHITE].clear()
             self.simulation()
-            self.backPropragation()
+
+            break
 
     def selection(self, player): # pick up the node with the highest score. Randomly choose one for tie
         l = []
@@ -179,7 +187,7 @@ class MCTS(object):
         return l
 
     def expansion(self, node, player):  # Expand the node in the real graph
-        self.arr[node] = player
+
         if self.isEnd(self.arr):
             cnt_b = 0
             cnt_w = 0
@@ -193,23 +201,59 @@ class MCTS(object):
             else:
                 print("The White wins!")
         else:
-            self.change_configurtion(node, self.arr)
-            self.arr_supposed = self.arr[:]
-            self.closure.append(node)
-            self.update_next_step(self.arr)
-
+            self.change_configurtion(node, self.arr, self.closure)
+            self.update_next_step(self.arr, self.closure)
+            # print(list(self.next_step_white))
+            # print(list(self.next_step_black))
 #   the machine run by itself
+
     def simulation(self):
+        # print("player: ", self.cur_player)
         winner = self.isEnd(self.arr_supposed)
+
+        self.arr_supposed = self.arr[:]
+        self.closure_supposed = self.closure[:]
+
+        # print("First borad:")
+        # self.showBoard(8, self.arr_supposed)
+
+        # print(self.closure_supposed)
+        cnt = 0
         while not winner:
+            self.update_next_step(self.arr_supposed, self.closure_supposed)
+            # print("next step white: ", self.next_step_white)
+            node = 0
             if self.cur_player == self.BLACK:
-                node = random.choice(list(self.next_step_black))
+                if len(list(self.next_step_black)) == 0:
+                    self.cur_player = 3 - self.cur_player
+                    continue
+                else:
+                    node = random.choice(list(self.next_step_black))
             else:
-                node = random.choice(list(self.next_step_white))
+                if len(list(self.next_step_white)) == 0:
+                    self.cur_player = 3 - self.cur_player
+                    continue
+                else:
+                    node = random.choice(list(self.next_step_white))
             self.simulation_path[self.cur_player].append(node)
-            self.change_configurtion(node, self.arr_supposed)
-            self.update_next_step(self.arr_supposed)
+
+            self.change_configurtion(node, self.arr_supposed, self.closure_supposed)
+            # test sentences
+            # if 58 <= cnt < 63:
+            #     print("player: ", 3 - self.cur_player)
+            #     print("Closure: ", self.closure_supposed)
+            #     if self.cur_player == 3 - self.WHITE:
+            #         print("White next step: ", list(self.next_step_white), node)
+            #     # self.showBoard(8, self.arr_supposed)
+            #     else:
+            #         print("Black next step: ", list(self.next_step_black), node)
+            #     self.showBoard(8, self.arr_supposed)
+
             winner = self.isEnd(self.arr_supposed)
+            # break
+            # cnt += 1
+
+
         self.backPropragation(winner)
 
     def backPropragation(self, winner):
@@ -220,10 +264,10 @@ class MCTS(object):
         for node in self.simulation_path[loser]:
             self.state_nodes[node]["cnt_total"] += 1
 
-    def showBoard(self, n): # the function to watch the board
+    def showBoard(self, n, arr): # the function to watch the board
         for i in range(n):
             for j in range(n):
-                print(self.arr[self.from2Dto1D(i, j)], end=" ")
+                print(arr[self.from2Dto1D(i, j)], end=" ")
             print()
 
     def isEnd(self, arr):  # return 0 means not reach the end; Return black or white means the winner.
@@ -274,7 +318,7 @@ class MCTS(object):
                 break
         if valid_step:
             return valid_step
-        for i in range(1, col):
+        for i in range(1, col + 1):
             if self.arr[p - i] == 0:
                 break
             if self.arr[p - i] == self.cur_player:
@@ -310,30 +354,29 @@ class MCTS(object):
                 return valid_step
         return valid_step
 
-    def check_step_valid(self, cur_pos, player):
+    def check_step_valid(self, arr, cur_pos, player):
         col = cur_pos % 8
         p = cur_pos
         valid_step = False
         # horizontal
         for i in range(1, 8 - col):
-            if self.arr[p + i] == self.NULL:
-                break
-            if self.arr[p + i] == player:
+            if arr[p + i] == player:
                 if i != 1:
                     valid_step = True
+                break
+            elif arr[p + i] == self.NULL:
                 break
         if valid_step:
             return valid_step
 
-
         for i in range(1, col + 1):
-            if self.arr[p - i] == self.NULL:
-                break
-            if self.arr[p - i] == player:
+            if arr[p - i] == player:
                 if i != 1:
                     valid_step = True
                     # print("i ", i)
                     # print(player, " ", self.arr[35])
+                break
+            elif arr[p - i] == self.NULL:
                 break
         if valid_step:
             # if cur_pos == 37:
@@ -345,11 +388,11 @@ class MCTS(object):
             p = cur_pos
             while p + slide < 64:
                 p += slide
-                if self.arr[p] == 0:
-                    break
-                elif self.arr[p] == player:
+                if arr[p] == player:
                     if p - cur_pos != slide:
                         valid_step = True
+                    break
+                elif arr[p] == self.NULL:
                     break
             if valid_step:
                 # if cur_pos == 37:
@@ -359,11 +402,11 @@ class MCTS(object):
             p = cur_pos
             while p - slide >= 0:
                 p -= slide
-                if self.arr[p] == 0:
-                    break
-                elif self.arr[p] == player:
+                if arr[p] == player:
                     if cur_pos - p != slide:
                         valid_step = True
+                    break
+                elif arr[p] == self.NULL:
                     break
             if valid_step:
                 # if cur_pos == 37:
@@ -371,6 +414,66 @@ class MCTS(object):
                 return valid_step
 
         return valid_step
+    def test_change_configuration(self):
+        print("Test change_configuration:")
+        self.change_configurtion(43, self.arr, self.closure)
+        self.showBoard(8, self.arr)
+        print()
+        self.change_configurtion(42, self.arr, self.closure)
+        self.showBoard(8, self.arr)
+
+    def test_update_next_step(self):
+        self.showBoard(8, self.arr)
+        print("Black ", self.next_step_black)
+
+        self.change_configurtion(34, self.arr, self.closure)
+        self.showBoard(8, self.arr)
+        self.update_next_step(self.arr, self.closure)
+        print("White ", self.next_step_white)
+
+        self.change_configurtion(42, self.arr, self.closure)
+        self.showBoard(8, self.arr)
+        self.update_next_step(self.arr, self.closure)
+        print("Black ", self.next_step_black)
+
+        self.change_configurtion(50, self.arr, self.closure)
+        self.showBoard(8, self.arr)
+        self.update_next_step(self.arr, self.closure)
+        print("White ", self.next_step_white)
+
+    def test_simulation(self):
+        self.cur_player = self.BLACK
+        self.expansion(43, self.arr)
+        self.arr_supposed = self.arr[:]
+        self.closure_supposed = self.closure[:]
+        print("First borad:")
+        self.showBoard(8, self.arr_supposed)
+
+        # print(self.closure_supposed)
+
+        self.update_next_step(self.arr_supposed, self.closure_supposed)
+        # if self.cur_player == self.BLACK:
+        #      node = random.choice(list(self.next_step_black))
+        # else:
+        #      node = random.choice(list(self.next_step_white))
+        nodes = {44, 29, 26}
+        for node in nodes:
+            self.simulation_path[self.cur_player].append(node)
+            self.change_configurtion(node, self.arr_supposed, self.closure_supposed)
+            self.update_next_step(self.arr_supposed, self.closure_supposed)
+
+            print("player: ", 3 - self.cur_player)
+            if self.cur_player == 3 - self.WHITE:
+                print(list(self.next_step_white), node)
+                # self.showBoard(8, self.arr_supposed)
+            else:
+                print(list(self.next_step_black), node)
+            self.showBoard(8, self.arr_supposed)
+
+
 
 tree = MCTS()
 tree.run()
+# tree.test_simulation()
+# tree.test_update_next_step()
+# tree.test_change_configuration()
