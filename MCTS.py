@@ -57,8 +57,7 @@ class MCTS(object):
                     if self.cur_player == self.WHITE and self.check_step_valid(arr, new_node, self.WHITE):
                         self.next_step_white.add(new_node)
 
-    def storeParamter(self):
-        f = open("", )
+
     def from2Dto1D(self, row, col):  # both row and col belong to [0, 8)
         return row * 8 + col
 
@@ -149,18 +148,38 @@ class MCTS(object):
         return valid_step
 
     def run(self):
-        l = self.selection(self.cur_player)
-        self.expansion(random.choice(l), self.cur_player)
-        # print("Before simulation: \n")
-        # self.showBoard(8, self.arr_supposed)
-        # print()
-        for i in range(1000):
-            # print(i)
-            self.simulation_path[self.BLACK].clear()
-            self.simulation_path[self.WHITE].clear()
-            self.simulation()
+        cnt_black = 0
+        player = self.cur_player
+        while not self.isEnd(self.arr):
+            self.cur_player = player
+            self.update_next_step(self.arr, self.closure)
+            # print(self.cur_player)
+            l = self.selection(player)
+            if len(l) == 0:
+                player = 3 - player
+                continue
 
-            break
+            self.expansion(random.choice(l), player)
+            # print("Before simulation: \n")
+            # self.showBoard(8, self.arr_supposed)
+            # print()
+            for i in range(10):
+                # print(i)
+                self.simulation_path[self.BLACK].clear()
+                self.simulation_path[self.WHITE].clear()
+                self.simulation()
+
+            self.showBoard(8, self.arr)
+            print()
+            player = 3 - player
+        for i in range(64):
+            if self.arr[i] == self.BLACK:
+                cnt_black += 1
+        if cnt_black > 64 - cnt_black:
+            print("The Black wins!")
+        else:
+            print("The White wins!")
+
 
     def selection(self, player): # pick up the node with the highest score. Randomly choose one for tie
         l = []
@@ -210,9 +229,9 @@ class MCTS(object):
 
     def simulation(self):
         # print("player: ", self.cur_player)
+        self.arr_supposed = self.arr[:]
         winner = self.isEnd(self.arr_supposed)
 
-        self.arr_supposed = self.arr[:]
         self.closure_supposed = self.closure[:]
 
         # print("First borad:")
@@ -300,7 +319,7 @@ class MCTS(object):
         cur_pos = self.from2Dto1D(row, col)
         cnt_win = self.state_nodes[cur_pos]["cnt_win"]
         cnt_total = self.state_nodes[cur_pos]["cnt_total"]
-        if cnt_total == 0:
+        if cnt_total == 0 or cnt_win == 0:
             return 0
         else:
             return cnt_win / cnt_total + c * math.sqrt(math.log(cnt_win, math.e) / cnt_total)
