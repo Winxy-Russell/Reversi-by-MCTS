@@ -155,8 +155,8 @@ class MCTS(object):
 
     def selection(self, player): # pick up the node with the highest score. Randomly choose one for tie
         l = []
+        max_score = -1
         if player == self.BLACK:
-            max_score = -1
             for node in self.next_step_black:
                 [row, col] = self.from1Dto2D(node)
                 score_tmp = self.score(row, col, self.c_black)
@@ -167,21 +167,20 @@ class MCTS(object):
                 elif max_score == score_tmp:
                     l.append(node)
         else:
-            min_score = 9999
             for node in self.next_step_white:
                 [row, col] = self.from1Dto2D(node)
                 score_tmp = self.score(row, col, self.c_white)
-                if min_score > score_tmp:
-                    min_score = score_tmp
+                if max_score < score_tmp:
+                    max_score = score_tmp
                     l.clear()
                     l.append(node)
-                elif min_score == score_tmp:
+                elif max_score == score_tmp:
                     l.append(node)
         return l
 
     def expansion(self, node, player):  # Expand the node in the real graph
         self.arr[node] = player
-        if self.isEnd():
+        if self.isEnd(self.arr):
             cnt_b = 0
             cnt_w = 0
             for i in self.arr:
@@ -201,23 +200,25 @@ class MCTS(object):
 
 #   the machine run by itself
     def simulation(self):
-        winner = self.isEnd()
+        winner = self.isEnd(self.arr_supposed)
         while not winner:
             if self.cur_player == self.BLACK:
-                node = random.choice(self.next_step_black)
+                node = random.choice(list(self.next_step_black))
             else:
-                node = random.choice(self.next_step_white)
-            self.simulation_path[self.cur_player].append()
+                node = random.choice(list(self.next_step_white))
+            self.simulation_path[self.cur_player].append(node)
             self.change_configurtion(node, self.arr_supposed)
             self.update_next_step(self.arr_supposed)
-            winner = self.isEnd()
+            winner = self.isEnd(self.arr_supposed)
         self.backPropragation(winner)
 
     def backPropragation(self, winner):
-        for i in range(64):
-            self.state_nodes[i]["cnt_total"] += 1
-            if self.arr_supposed[i] == winner:
-                self.state_nodes[i]["cnt_win"] += 1
+        for node in self.simulation_path[winner]:
+            self.state_nodes[node]["cnt_win"] += 1
+            self.state_nodes[node]["cnt_total"] += 1
+        loser = 3 - winner
+        for node in self.simulation_path[loser]:
+            self.state_nodes[node]["cnt_total"] += 1
 
     def showBoard(self, n): # the function to watch the board
         for i in range(n):
@@ -322,8 +323,6 @@ class MCTS(object):
                     valid_step = True
                 break
         if valid_step:
-            if cur_pos == 37:
-                print(1)
             return valid_step
 
 
