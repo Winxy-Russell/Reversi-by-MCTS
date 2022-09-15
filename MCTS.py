@@ -9,8 +9,7 @@ class MCTS(object):
         self.NULL = 0
         self.BLACK = 1
         self.WHITE = 2
-        self.c_black = 1.3
-        self.c_white = 1.4
+        self.c = 2
 
         self.cur_player = self.BLACK
 
@@ -58,6 +57,8 @@ class MCTS(object):
                     if self.cur_player == self.WHITE and self.check_step_valid(arr, new_node, self.WHITE):
                         self.next_step_white.add(new_node)
 
+    def storeParamter(self):
+        f = open("", )
     def from2Dto1D(self, row, col):  # both row and col belong to [0, 8)
         return row * 8 + col
 
@@ -167,7 +168,7 @@ class MCTS(object):
         if player == self.BLACK:
             for node in self.next_step_black:
                 [row, col] = self.from1Dto2D(node)
-                score_tmp = self.score(row, col, self.c_black)
+                score_tmp = self.score(row, col, self.c)
                 if max_score < score_tmp:
                     max_score = score_tmp
                     l.clear()
@@ -177,7 +178,7 @@ class MCTS(object):
         else:
             for node in self.next_step_white:
                 [row, col] = self.from1Dto2D(node)
-                score_tmp = self.score(row, col, self.c_white)
+                score_tmp = self.score(row, col, self.c)
                 if max_score < score_tmp:
                     max_score = score_tmp
                     l.clear()
