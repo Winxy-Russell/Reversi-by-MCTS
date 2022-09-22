@@ -14,7 +14,7 @@ python MCTS.py
 
 The game has started! You'll probably see the interface like:
 
-![image](/image-20220922190541544)
+![image](/image-20220922190541544.png)
 
 Hope you have a good experience!
 
