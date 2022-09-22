@@ -50,6 +50,7 @@ class MCTS(object):
         self.white = (255, 255, 255)
         self.screen_width = 800
         self.screen_height = 1000
+
         # 创建屏幕对象
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         # 界面背景颜色渲染，放在while中会不断覆盖格子
