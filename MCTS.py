@@ -46,7 +46,7 @@ class MCTS(object):
         pygame.init()
         self.cb = (0, 0, 0)  # cb=checkerboard=棋盘网格线颜色，darkgreen
         self.bg = (192, 192, 192)  # 背景颜色=蜜露色，bg=background
-        self.black = (41, 36, 33)
+        self.black = (78, 120, 99)
         self.white = (255, 255, 255)
         self.screen_width = 800
         self.screen_height = 1000
@@ -195,48 +195,6 @@ class MCTS(object):
             self.cur_player = 3 - self.cur_player
             closure.append(cur_pos)
         return valid_step
-
-    def run(self):
-        cnt_black = 0
-        player = self.cur_player
-        while not self.isEnd(self.arr):
-            self.cur_player = player
-            self.update_next_step(self.arr, self.closure)
-            # print(self.cur_player)
-            l = self.selection(player)
-            if len(l) == 0:
-                player = 3 - player
-                continue
-            ###############
-            move1d = random.choice(l)
-            red = [255, 0, 0]
-            [row, col] = self.from1Dto2D(move1d)
-            pygame.draw.rect(self.screen, red, ((col * 100 + 1, row * 100 + 1), (99, 99)))
-            pygame.display.flip()
-            time.sleep(3)
-            self.expansion(move1d, player)
-            ###############
-            # print("Before simulation: \n")
-            # self.showBoard(8, self.arr_supposed)
-            # print()
-            for i in range(10):
-                # print(i)
-                self.cur_player = player
-                self.simulation()
-
-            self.showBoard(8, self.arr)
-
-            self.board(self.arr, player)
-            # 棋盘
-            print()
-            player = 3 - player
-        for i in range(64):
-            if self.arr[i] == self.BLACK:
-                cnt_black += 1
-        if cnt_black > 64 - cnt_black:
-            print("The Black wins!")
-        else:
-            print("The White wins!")
 
     def selection(self, player):  # pick up the node with the highest score. Randomly choose one for tie
         l = []
@@ -616,6 +574,8 @@ class MCTS(object):
         while True:
             update()
             for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    return [-1, -1]
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     [x, y] = event.pos
                     row = int(x / 100)
@@ -625,24 +585,84 @@ class MCTS(object):
                     # 将渲染的界面显示
             pygame.display.flip()
 
-    def playerVsAI(self):
-        # 1 black 2white
+    def run(self):
         cnt_black = 0
         player = self.cur_player
+        choice_defen = 1
         while not self.isEnd(self.arr):
             self.cur_player = player
             self.update_next_step(self.arr, self.closure)
             # print(self.cur_player)
             l = self.selection(player)
             if len(l) == 0:
+                if choice_defen == 0:
+                    break
+                choice_defen = 0
                 player = 3 - player
                 continue
+            else:
+                choice_defen = 1
+            ###############
+            move1d = random.choice(l)
+            red = [255, 0, 0]
+            [row, col] = self.from1Dto2D(move1d)
+            pygame.draw.rect(self.screen, red, ((col * 100 + 1, row * 100 + 1), (99, 99)))
+            pygame.display.flip()
+            self.expansion(move1d, player)
+            ###############
+            # over
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    return False
+            # print("Before simulation: \n")
+            # self.showBoard(8, self.arr_supposed)
+            # # print()
+            # time.sleep(2)
+            for i in range(10):
+                # print(i)
+                self.cur_player = player
+                self.simulation()
+
+            self.showBoard(8, self.arr)
+
+            self.board(self.arr, player)
+            # 棋盘
+            print()
+            player = 3 - player
+        for i in range(64):
+            if self.arr[i] == self.BLACK:
+                cnt_black += 1
+        if cnt_black > 64 - cnt_black:
+            print("The Black wins!")
+        else:
+            print("The White wins!")
+
+    def playerVsAI(self):
+        # 1 black 2white
+        cnt_black = 0
+        player = self.cur_player
+        choice_defen = 1
+        while not self.isEnd(self.arr):
+            self.cur_player = player
+            self.update_next_step(self.arr, self.closure)
+            # print(self.cur_player)
+            l = self.selection(player)
+            if len(l) == 0:
+                if choice_defen == 0:
+                    break
+                choice_defen = 0
+                player = 3 - player
+                continue
+            else:
+                choice_defen = 1
 
             move_1d = random.choice(l)  # black's turn aka AI's turn
             if player == 2:  # white's turn
                 judge = 0
                 while not judge:
                     [col, row] = self.get2DPosition()
+                    if col == -1 and row == -1:
+                        return False
                     cur_pos = self.from2Dto1D(row, col)
                     if self.check_step_valid(self.arr, cur_pos, player):
                         move_1d = cur_pos
@@ -658,12 +678,11 @@ class MCTS(object):
             # print()
             for i in range(10):
                 # print(i)
-                self.simulation_path[self.BLACK].clear()
-                self.simulation_path[self.WHITE].clear()
                 self.simulation()
 
             self.showBoard(8, self.arr)
             self.board(self.arr, player)
+            print()
             # 棋盘
             player = 3 - player
         for i in range(64):
@@ -702,7 +721,7 @@ class MCTS(object):
         #     pygame.display.flip()
         # if player == 1:
         #     time.sleep(1)
-        time.sleep(2)
+        # time.sleep(2)
         for i in range(8):
             for j in range(8):
                 chess_color = self.arr[self.from2Dto1D(i, j)]
@@ -712,9 +731,44 @@ class MCTS(object):
                     pygame.draw.rect(self.screen, self.white, ((j * 100 + 1, i * 100 + 1), (99, 99)))
         pygame.display.flip()
 
+    def mainActivity(self):
+        # 加载字体
+        textFont = pygame.font.SysFont(None, 50)
+        textSurface = textFont.render("AI vs AI", True, (255, 255, 255))
+        textSurface_1 = textFont.render("AI vs Player", True, (255, 255, 255))
+        self.screen.blit(textSurface, (130 + 1, 875 + 1))
+        self.screen.blit(textSurface_1, (502 + 1, 875 + 1))
+        # pygame.draw.rect(self.screen, self.black, ((100 + 1, 850 + 1), (200, 100)), 1)
+        # pygame.draw.rect(self.screen, self.black, ((500 + 1, 850 + 1), (200, 100)), 1)
+        pygame.display.flip()
+        judge = 0
+        while not judge:
+            # quit playing
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    judge = 1
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    [x, y] = event.pos
+                    row = int(x / 100)
+                    col = int(y / 100)
+                    print(x, y)  # 当前在屏幕中的坐标
+                    if 100 < x < 300 and 850 < y < 950:
+                        if not self.run():
+                            judge = 1
+                    if 500 < x < 700 and 850 < y < 950:
+                        if not self.playerVsAI():
+                            judge = 1
+            # [col, row] = self.get2DPosition()
+            # cur_pos = self.from2Dto1D(row, col)
+            # if self.check_step_valid(self.arr, cur_pos, player):
+            #     move_1d = cur_pos
+            #     judge = 1
+            # else:
+            #     print("落子无效")
+
 
 tree = MCTS()
-tree.run()
+tree.mainActivity()
 # tree.test_simulation()
 # tree.test_update_next_step()
 # tree.test_change_configuration()

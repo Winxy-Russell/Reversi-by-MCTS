@@ -14,7 +14,7 @@ python MCTS.py
 
 The game has started! You'll probably see the interface like:
 
-![image-20220922190541544](C:\Users\Winxy\AppData\Roaming\Typora\typora-user-images\image-20220922190541544.png)
+![image](/image-20220922190541544.png)
 
 Hope you have a good experience!
 
