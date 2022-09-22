@@ -1,8 +1,8 @@
-'''
- This is a simple realization of MCTS
-'''
 import random
 import math
+import pygame
+import time
+
 
 class MCTS(object):
     def __init__(self):
@@ -13,22 +13,23 @@ class MCTS(object):
 
         self.cur_player = self.BLACK
 
-        self.arr = [] # this array is used for store the chessboard with size 8 * 8
+        self.arr = []  # this array is used for store the chessboard with size 8 * 8
         self.scores = []
         for i in range(64):
             self.arr.append(0)
             self.scores.append(0)
         self.arr[self.from2Dto1D(4, 4)] = self.arr[self.from2Dto1D(3, 3)] = self.BLACK
         self.arr[self.from2Dto1D(4, 3)] = self.arr[self.from2Dto1D(3, 4)] = self.WHITE
-        self.arr_supposed = self.arr[:] # The array for machine learning
+
+        self.arr_supposed = self.arr[:]  # The array for machine learning
 
         self.next_step_black = set()
         self.next_step_white = set()
-        self.state_nodes = [] # each element is a directory containing times of exploration and times of win
+        self.state_nodes = []  # each element is a directory containing times of exploration and times of win
         self.last_change = []
         for i in range(64):
             self.node = {}
-            self.node["cnt_win"] = 0 # times to be chose
+            self.node["cnt_win"] = 0  # times to be chose
             self.node["cnt_total"] = 0
             self.state_nodes.append(self.node)
 
@@ -41,6 +42,29 @@ class MCTS(object):
         self.simulation_path = [[], [], []]
         self.update_next_step(self.arr, self.closure)
 
+        # 初始化模块，加一下稳一些
+        pygame.init()
+        self.cb = (0, 0, 0)  # cb=checkerboard=棋盘网格线颜色，darkgreen
+        self.bg = (192, 192, 192)  # 背景颜色=蜜露色，bg=background
+        self.black = (41, 36, 33)
+        self.white = (255, 255, 255)
+        self.screen_width = 800
+        self.screen_height = 1000
+        # 创建屏幕对象
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        # 界面背景颜色渲染，放在while中会不断覆盖格子
+        self.screen.fill(self.bg)
+        # 绘制网格线
+        for i in range(8):
+            pygame.draw.line(self.screen, self.cb, (i * 100, 0), (i * 100, self.screen_width - 1))
+            pygame.draw.line(self.screen, self.cb, (0, i * 100), (self.screen_width - 1, i * 100))
+        pygame.draw.line(self.screen, self.cb, (0, self.screen_width - 1),
+                         (self.screen_width - 1, self.screen_width - 1))
+        pygame.draw.line(self.screen, self.cb, (self.screen_width - 1, 0),
+                         (self.screen_width - 1, self.screen_width - 1))
+        # 界面的标题
+        pygame.display.set_caption('黑白棋')
+
     def update_next_step(self, arr, closure):
         self.next_step_black.clear()
         self.next_step_white.clear()
@@ -49,14 +73,13 @@ class MCTS(object):
             tmp = {1, -1, 8, -8, 7, -7, 9, -9}
             for j in tmp:
                 new_node = closed_node + j
-
-                if 0 <= new_node < 64 and arr[new_node] == self.NULL:
-                    if self.cur_player == self.BLACK and self.check_step_valid(arr, new_node, self.BLACK):
-                        self.next_step_black.add(new_node)
-
-                    if self.cur_player == self.WHITE and self.check_step_valid(arr, new_node, self.WHITE):
-                        self.next_step_white.add(new_node)
-
+                if 0 <= new_node < 64 and arr[new_node] == self.NULL:  # pos of new_node is within the map and null
+                    if self.check_step_valid(arr, new_node,
+                                             self.cur_player):  # check if new node is valid for cur player
+                        if self.cur_player == self.BLACK:
+                            self.next_step_black.add(new_node)
+                        else:
+                            self.next_step_white.add(new_node)
 
     def from2Dto1D(self, row, col):  # both row and col belong to [0, 8)
         return row * 8 + col
@@ -66,14 +89,14 @@ class MCTS(object):
         col = node % 8
         return [row, col]
 
-    def change_configurtion(self, cur_pos, arr, closure): # The position given by cur_pos has to be valid.
+    def change_configurtion(self, cur_pos, arr, closure):  # The position given by cur_pos has to be valid.
         # cur_pos = self.from2Dto1D(row, col)
         [row, col] = self.from1Dto2D(cur_pos)
         # print("Col: ", col)
         p = cur_pos
         can_flip = False
         valid_step = False
-        # horizontal
+        # horizontal check
         for i in range(1, 8 - col):
             if arr[p + i] == self.NULL:
                 break
@@ -88,6 +111,7 @@ class MCTS(object):
                     break
                 arr[p + i] = self.cur_player
             can_flip = False
+
         for i in range(1, col + 1):
             if arr[p - i] == self.NULL:
                 break
@@ -103,17 +127,29 @@ class MCTS(object):
                 arr[p - i] = self.cur_player
             can_flip = False
 
-        #vertical, diagnoal
+        # vertical, diagnoal
         for slide in range(7, 10):
+            # some special cases
+
             p = cur_pos
             while p + slide < 64:
+                if col == 0 and slide == 7:
+                    break
+                if col == 7 and slide == 9:
+                    break
                 p += slide
+                [row_p, col_p] = self.from1Dto2D(p)
                 if arr[p] == self.NULL:
                     break
                 elif arr[p] == self.cur_player:
                     if p - cur_pos != slide:
                         valid_step = True
                         can_flip = True
+                    break
+                if col_p == 0 and slide == 7:
+                    break
+                if col_p == 7 and slide == 9:
+                    break
 
             if can_flip:
                 p = cur_pos
@@ -126,13 +162,25 @@ class MCTS(object):
 
             p = cur_pos
             while p - slide >= 0:
+                if col == 0 and slide == 9:
+                    break
+                if col == 7 and slide == 7:
+                    break
                 p -= slide
+
                 if arr[p] == self.NULL:
                     break
                 elif arr[p] == self.cur_player:
                     if cur_pos - p != slide:
                         valid_step = True
                         can_flip = True
+                    break
+                [row_p, col_p] = self.from1Dto2D(p)
+                if col_p == 0 and slide == 9:
+                    break
+                if col_p == 7 and slide == 7:
+                    break
+
             if can_flip:
                 p = cur_pos
                 while p - slide >= 0:
@@ -141,6 +189,7 @@ class MCTS(object):
                         break
                     arr[p] = self.cur_player
                 can_flip = False
+
         if valid_step:
             arr[cur_pos] = self.cur_player
             self.cur_player = 3 - self.cur_player
@@ -158,18 +207,27 @@ class MCTS(object):
             if len(l) == 0:
                 player = 3 - player
                 continue
-
-            self.expansion(random.choice(l), player)
+            ###############
+            move1d = random.choice(l)
+            red = [255, 0, 0]
+            [row, col] = self.from1Dto2D(move1d)
+            pygame.draw.rect(self.screen, red, ((col * 100 + 1, row * 100 + 1), (99, 99)))
+            pygame.display.flip()
+            time.sleep(3)
+            self.expansion(move1d, player)
+            ###############
             # print("Before simulation: \n")
             # self.showBoard(8, self.arr_supposed)
             # print()
             for i in range(10):
                 # print(i)
-                self.simulation_path[self.BLACK].clear()
-                self.simulation_path[self.WHITE].clear()
+                self.cur_player = player
                 self.simulation()
 
             self.showBoard(8, self.arr)
+
+            self.board(self.arr, player)
+            # 棋盘
             print()
             player = 3 - player
         for i in range(64):
@@ -180,8 +238,7 @@ class MCTS(object):
         else:
             print("The White wins!")
 
-
-    def selection(self, player): # pick up the node with the highest score. Randomly choose one for tie
+    def selection(self, player):  # pick up the node with the highest score. Randomly choose one for tie
         l = []
         max_score = -1
         if player == self.BLACK:
@@ -225,38 +282,69 @@ class MCTS(object):
             self.update_next_step(self.arr, self.closure)
             # print(list(self.next_step_white))
             # print(list(self.next_step_black))
-#   the machine run by itself
+
+    #   the machine run by itself
 
     def simulation(self):
         # print("player: ", self.cur_player)
         self.arr_supposed = self.arr[:]
-        winner = self.isEnd(self.arr_supposed)
-
         self.closure_supposed = self.closure[:]
-
-        # print("First borad:")
-        # self.showBoard(8, self.arr_supposed)
-
-        # print(self.closure_supposed)
-        cnt = 0
+        winner = self.isEnd(self.arr_supposed)
+        self.simulation_path[self.BLACK].clear()
+        self.simulation_path[self.WHITE].clear()
+        choices_of_adver = 1
+        cnt_black = 0
+        cnt_white = 0
         while not winner:
             self.update_next_step(self.arr_supposed, self.closure_supposed)
             # print("next step white: ", self.next_step_white)
             node = 0
             if self.cur_player == self.BLACK:
+                # print("Black: ", self.next_step_black)
                 if len(list(self.next_step_black)) == 0:
                     self.cur_player = 3 - self.cur_player
+                    # self.showBoard(8, self.arr_supposed)
+                    if choices_of_adver == 0:
+                        for i in range(64):
+                            if self.arr_supposed[i] == self.BLACK:
+                                cnt_black += 1
+                            elif self.arr_supposed[i] == self.WHITE:
+                                cnt_white += 1
+                        if cnt_black > cnt_white:
+                            winner = self.BLACK
+                        else:
+                            winner = self.WHITE
+                        break
+                    # exit(1)
+                    choices_of_adver = 0
                     continue
                 else:
                     node = random.choice(list(self.next_step_black))
+                    choices_of_adver = 1
             else:
+                # print("White: ", self.next_step_white)
                 if len(list(self.next_step_white)) == 0:
                     self.cur_player = 3 - self.cur_player
+                    # self.showBoard(8, self.arr_supposed)
+                    if choices_of_adver == 0:
+                        for i in range(64):
+                            if self.arr_supposed[i] == self.BLACK:
+                                cnt_black += 1
+                            elif self.arr_supposed[i] == self.WHITE:
+                                cnt_white += 1
+                        if cnt_black > cnt_white:
+                            winner = self.BLACK
+                        else:
+                            winner = self.WHITE
+                        break
+                    # exit(1)
+                    choices_of_adver = 0
+                    # exit(1)
                     continue
                 else:
                     node = random.choice(list(self.next_step_white))
+                    choices_of_adver = 1
             self.simulation_path[self.cur_player].append(node)
-
             self.change_configurtion(node, self.arr_supposed, self.closure_supposed)
             # test sentences
             # if 58 <= cnt < 63:
@@ -270,9 +358,10 @@ class MCTS(object):
             #     self.showBoard(8, self.arr_supposed)
 
             winner = self.isEnd(self.arr_supposed)
+            # self.showBoard(8, self.arr_supposed)
+            # print()
             # break
             # cnt += 1
-
 
         self.backPropragation(winner)
 
@@ -284,7 +373,7 @@ class MCTS(object):
         for node in self.simulation_path[loser]:
             self.state_nodes[node]["cnt_total"] += 1
 
-    def showBoard(self, n, arr): # the function to watch the board
+    def showBoard(self, n, arr):  # the function to watch the board
         for i in range(n):
             for j in range(n):
                 print(arr[self.from2Dto1D(i, j)], end=" ")
@@ -315,7 +404,7 @@ class MCTS(object):
             else:
                 return self.WHITE
 
-    def score(self, row, col, c): # given the node, return the score of it
+    def score(self, row, col, c):  # given the node, return the score of it
         cur_pos = self.from2Dto1D(row, col)
         cnt_win = self.state_nodes[cur_pos]["cnt_win"]
         cnt_total = self.state_nodes[cur_pos]["cnt_total"]
@@ -324,7 +413,7 @@ class MCTS(object):
         else:
             return cnt_win / cnt_total + c * math.sqrt(math.log(cnt_win, math.e) / cnt_total)
 
-    def check_step_valid(self, row, col, player): # for the given player, to check if the given step is valid or not
+    def check_step_valid(self, row, col, player):  # for the given player, to check if the given step is valid or not
         cur_pos = self.from2Dto1D(row, col)
         p = cur_pos
         valid_step = False
@@ -378,8 +467,8 @@ class MCTS(object):
         col = cur_pos % 8
         p = cur_pos
         valid_step = False
-        # horizontal
-        for i in range(1, 8 - col):
+        # horizontal check
+        for i in range(1, 8 - col):  # [1 + col, 8)
             if arr[p + i] == player:
                 if i != 1:
                     valid_step = True
@@ -389,7 +478,7 @@ class MCTS(object):
         if valid_step:
             return valid_step
 
-        for i in range(1, col + 1):
+        for i in range(1, col + 1):  # [0, col - 1)
             if arr[p - i] == player:
                 if i != 1:
                     valid_step = True
@@ -403,16 +492,27 @@ class MCTS(object):
             #     print(2)
             return valid_step
 
-        # vertical, diagnoal
+        # vertical, diagnoal checking
         for slide in range(7, 10):
             p = cur_pos
+
             while p + slide < 64:
+                if col == 0 and slide == 7:
+                    break
+                if col == 7 and slide == 9:
+                    break
                 p += slide
+
                 if arr[p] == player:
                     if p - cur_pos != slide:
                         valid_step = True
                     break
                 elif arr[p] == self.NULL:
+                    break
+                [row_p, col_p] = self.from1Dto2D(p)  # to check if p is valid
+                if col_p == 0 and slide == 7:
+                    break
+                if col_p == 7 and slide == 9:
                     break
             if valid_step:
                 # if cur_pos == 37:
@@ -420,13 +520,24 @@ class MCTS(object):
                 return valid_step
 
             p = cur_pos
+
             while p - slide >= 0:
+                if col == 0 and slide == 9:
+                    break
+                if col == 7 and slide == 7:
+                    break
                 p -= slide
+
                 if arr[p] == player:
                     if cur_pos - p != slide:
                         valid_step = True
                     break
                 elif arr[p] == self.NULL:
+                    break
+                [row_p, col_p] = self.from1Dto2D(p)
+                if col_p == 0 and slide == 9:
+                    break
+                if col_p == 7 and slide == 7:
                     break
             if valid_step:
                 # if cur_pos == 37:
@@ -434,6 +545,7 @@ class MCTS(object):
                 return valid_step
 
         return valid_step
+
     def test_change_configuration(self):
         print("Test change_configuration:")
         self.change_configurtion(43, self.arr, self.closure)
@@ -490,6 +602,115 @@ class MCTS(object):
                 print(list(self.next_step_black), node)
             self.showBoard(8, self.arr_supposed)
 
+    def get2DPosition(self):
+        # 刷新界面函数
+        def update():
+            for i in range(8):
+                for j in range(8):
+                    chess_color = self.arr[self.from2Dto1D(i, j)]
+                    if chess_color == 1:
+                        pygame.draw.rect(self.screen, self.black, ((j * 100 + 1, i * 100 + 1), (99, 99)))
+                    if chess_color == 2:
+                        pygame.draw.rect(self.screen, self.white, ((j * 100 + 1, i * 100 + 1), (99, 99)))
+
+        while True:
+            update()
+            for event in pygame.event.get():
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    [x, y] = event.pos
+                    row = int(x / 100)
+                    col = int(y / 100)
+                    print(row, col)  # 当前在屏幕中的坐标
+                    return [row, col]
+                    # 将渲染的界面显示
+            pygame.display.flip()
+
+    def playerVsAI(self):
+        # 1 black 2white
+        cnt_black = 0
+        player = self.cur_player
+        while not self.isEnd(self.arr):
+            self.cur_player = player
+            self.update_next_step(self.arr, self.closure)
+            # print(self.cur_player)
+            l = self.selection(player)
+            if len(l) == 0:
+                player = 3 - player
+                continue
+
+            move_1d = random.choice(l)  # black's turn aka AI's turn
+            if player == 2:  # white's turn
+                judge = 0
+                while not judge:
+                    [col, row] = self.get2DPosition()
+                    cur_pos = self.from2Dto1D(row, col)
+                    if self.check_step_valid(self.arr, cur_pos, player):
+                        move_1d = cur_pos
+                        judge = 1
+                    else:
+                        print("落子无效")
+
+            # for i in l:
+            #     print(self.from1Dto2D(i))
+            self.expansion(move_1d, player)  # l是1D的
+            # print("Before simulation: \n")
+            # self.showBoard(8, self.arr_supposed)
+            # print()
+            for i in range(10):
+                # print(i)
+                self.simulation_path[self.BLACK].clear()
+                self.simulation_path[self.WHITE].clear()
+                self.simulation()
+
+            self.showBoard(8, self.arr)
+            self.board(self.arr, player)
+            # 棋盘
+            player = 3 - player
+        for i in range(64):
+            if self.arr[i] == self.BLACK:
+                cnt_black += 1
+        if cnt_black > 64 - cnt_black:
+            print("The Black wins!")
+        else:
+            print("The White wins!")
+
+    def board(self, arr, player):
+        # # 刷新界面函数
+        # def update():
+        #     for i in range(8):
+        #         for j in range(8):
+        #             chess_color = arr[self.from2Dto1D(i, j)]
+        #             if chess_color == 1:
+        #                 pygame.draw.rect(self.screen, self.black, ((j * 100 + 1, i * 100 + 1), (99, 99)))
+        #             if chess_color == 2:
+        #                 pygame.draw.rect(self.screen, self.white, ((j * 100 + 1, i * 100 + 1), (99, 99)))
+        #
+        # # 游戏状态，0表示未分胜负，-1表示个人胜利，1表示电脑获胜
+        # judge = 0
+        # while not judge:
+        #     update()
+        #     if self.isEnd(arr):
+        #         judge = 1
+        #     # 感应事件
+        #     for event in pygame.event.get():
+        #         # 点击关闭窗口，退出游戏
+        #         # if event.type == pygame.MOUSEBUTTONDOWN:
+        #         #     sys.exit()
+        #         if event.type == pygame.QUIT:
+        #             judge = 1
+        #     # 将渲染的界面显示
+        #     pygame.display.flip()
+        # if player == 1:
+        #     time.sleep(1)
+        time.sleep(2)
+        for i in range(8):
+            for j in range(8):
+                chess_color = self.arr[self.from2Dto1D(i, j)]
+                if chess_color == 1:
+                    pygame.draw.rect(self.screen, self.black, ((j * 100 + 1, i * 100 + 1), (99, 99)))
+                if chess_color == 2:
+                    pygame.draw.rect(self.screen, self.white, ((j * 100 + 1, i * 100 + 1), (99, 99)))
+        pygame.display.flip()
 
 
 tree = MCTS()
