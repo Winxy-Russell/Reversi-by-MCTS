@@ -11,6 +11,9 @@ class MCTS(object):
         self.WHITE = 2
         self.c = 2
 
+        self.c_train = [0, 5, 2]  # adapt c by AI vs AI
+        self.winner_train = self.BLACK
+
         self.cur_player = self.BLACK
 
         self.arr = []  # this array is used for store the chessboard with size 8 * 8
@@ -50,7 +53,6 @@ class MCTS(object):
         self.white = (255, 255, 255)
         self.screen_width = 800
         self.screen_height = 1000
-
         # 创建屏幕对象
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         # 界面背景颜色渲染，放在while中会不断覆盖格子
@@ -214,6 +216,7 @@ class MCTS(object):
             for node in self.next_step_white:
                 [row, col] = self.from1Dto2D(node)
                 score_tmp = self.score(row, col, self.c)
+                # score_tmp = self.score(row, col, self.c[player]) # used for adapt c
                 if max_score < score_tmp:
                     max_score = score_tmp
                     l.clear()
@@ -562,18 +565,7 @@ class MCTS(object):
             self.showBoard(8, self.arr_supposed)
 
     def get2DPosition(self):
-        # 刷新界面函数
-        def update():
-            for i in range(8):
-                for j in range(8):
-                    chess_color = self.arr[self.from2Dto1D(i, j)]
-                    if chess_color == 1:
-                        pygame.draw.rect(self.screen, self.black, ((j * 100 + 1, i * 100 + 1), (99, 99)))
-                    if chess_color == 2:
-                        pygame.draw.rect(self.screen, self.white, ((j * 100 + 1, i * 100 + 1), (99, 99)))
-
         while True:
-            update()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     return [-1, -1]
@@ -582,14 +574,18 @@ class MCTS(object):
                     row = int(x / 100)
                     col = int(y / 100)
                     print(row, col)  # 当前在屏幕中的坐标
+                    if row > 7 or col > 7:
+                        return [-2, -2]
                     return [row, col]
                     # 将渲染的界面显示
             pygame.display.flip()
 
     def run(self):
+        self.__init__()
         cnt_black = 0
         player = self.cur_player
         choice_defen = 1
+        total_time = 0
         while not self.isEnd(self.arr):
             self.cur_player = player
             self.update_next_step(self.arr, self.closure)
@@ -619,13 +615,18 @@ class MCTS(object):
             # self.showBoard(8, self.arr_supposed)
             # # print()
             # time.sleep(2)
+            # calculate single time
+            start_time = time.perf_counter()
             for i in range(10):
                 # print(i)
                 self.cur_player = player
                 self.simulation()
+            end_time = time.perf_counter()
+            single_time = end_time - start_time
+            total_time += single_time
 
+            self.showtThetime(single_time, total_time)
             self.showBoard(8, self.arr)
-
             self.board(self.arr, player)
             # 棋盘
             print()
@@ -635,14 +636,28 @@ class MCTS(object):
                 cnt_black += 1
         if cnt_black > 64 - cnt_black:
             print("The Black wins!")
+            textfont = pygame.font.SysFont(None, 30)
+            congradulations = textfont.render("The Black wins!", True, self.black)
+            self.screen.blit(congradulations, (310 + 1, 850 + 1))
+            self.winner_train = self.BLACK
+            pygame.display.flip()
         else:
             print("The White wins!")
+            textfont = pygame.font.SysFont(None, 30)
+            congradulations = textfont.render("The White wins!", True, self.white)
+            self.screen.blit(congradulations, (310 + 1, 850 + 1))
+            self.winner_train = self.WHITE
+            pygame.display.flip()
+        return True
 
     def playerVsAI(self):
         # 1 black 2white
+        self.__init__()
         cnt_black = 0
         player = self.cur_player
         choice_defen = 1
+        total_time = 0
+        single_time = 0
         while not self.isEnd(self.arr):
             self.cur_player = player
             self.update_next_step(self.arr, self.closure)
@@ -662,12 +677,16 @@ class MCTS(object):
                 judge = 0
                 while not judge:
                     [col, row] = self.get2DPosition()
+                    if col == -2 and row == -2:
+                        print("落子无效")
                     if col == -1 and row == -1:
                         return False
                     cur_pos = self.from2Dto1D(row, col)
-                    if self.check_step_valid(self.arr, cur_pos, player):
+                    if self.check_step_valid(self.arr, cur_pos, player) and self.arr[cur_pos] != 1:
                         move_1d = cur_pos
                         judge = 1
+                        pygame.draw.rect(self.screen, self.white, ((col * 100 + 1, row * 100 + 1), (98, 98)))
+                        pygame.display.flip()
                     else:
                         print("落子无效")
 
@@ -677,71 +696,122 @@ class MCTS(object):
             # print("Before simulation: \n")
             # self.showBoard(8, self.arr_supposed)
             # print()
+            start_time = time.perf_counter()
             for i in range(10):
                 # print(i)
                 self.simulation()
+            end_time = time.perf_counter()
+            single_time = end_time - start_time
+            total_time += single_time
+            self.showtThetime(single_time, total_time)
 
             self.showBoard(8, self.arr)
-            self.board(self.arr, player)
             print()
             # 棋盘
+            self.board(self.arr, player)
             player = 3 - player
+        self.showtThetime(single_time, total_time)
+        self.board(self.arr, player)
         for i in range(64):
             if self.arr[i] == self.BLACK:
                 cnt_black += 1
         if cnt_black > 64 - cnt_black:
             print("The Black wins!")
+            textfont = pygame.font.SysFont(None, 30)
+            congradulations = textfont.render("The Black wins!", True, self.black)
+            self.screen.blit(congradulations, (300 + 1, 850 + 1))
+            pygame.display.flip()
         else:
             print("The White wins!")
+            textfont = pygame.font.SysFont(None, 30)
+            congradulations = textfont.render("The White wins!", True, self.white)
+            self.screen.blit(congradulations, (300 + 1, 850 + 1))
+            pygame.display.flip()
+        return True
+
+    def initializeBoard(self):
+        # 加载字体
+        # 加载时间字体
+        self.screen.fill(self.bg)
+        textFont = pygame.font.SysFont(None, 50)
+        textSurface = textFont.render("AI vs AI", True, (255, 255, 255))
+        textSurface_1 = textFont.render("AI vs Player", True, (255, 255, 255))
+        self.screen.blit(textSurface, (130 + 1, 875 + 1))
+        self.screen.blit(textSurface_1, (502 + 1, 875 + 1))
+
+        # 绘制网格线
+        for i in range(8):
+            pygame.draw.line(self.screen, self.cb, (i * 100, 0), (i * 100, self.screen_width - 1))
+            pygame.draw.line(self.screen, self.cb, (0, i * 100), (self.screen_width - 1, i * 100))
+        pygame.draw.line(self.screen, self.cb, (0, self.screen_width - 1),
+                         (self.screen_width - 1, self.screen_width - 1))
+        pygame.draw.line(self.screen, self.cb, (self.screen_width - 1, 0),
+                         (self.screen_width - 1, self.screen_width - 1))
+        # 界面的标题
+        pygame.display.set_caption('黑白棋')
+        pygame.display.flip()
+
+    def showtThetime(self, single_time, total_time):
+        # 加载时间字体
+        self.screen.fill(self.bg)
+        # 绘制网格线
+        for i in range(8):
+            pygame.draw.line(self.screen, self.cb, (i * 100, 0), (i * 100, self.screen_width - 1))
+            pygame.draw.line(self.screen, self.cb, (0, i * 100), (self.screen_width - 1, i * 100))
+        pygame.draw.line(self.screen, self.cb, (0, self.screen_width - 1),
+                         (self.screen_width - 1, self.screen_width - 1))
+        pygame.draw.line(self.screen, self.cb, (self.screen_width - 1, 0),
+                         (self.screen_width - 1, self.screen_width - 1))
+        # 界面的标题
+        pygame.display.set_caption('黑白棋')
+
+        textfont = pygame.font.SysFont(None, 30)
+        single = textfont.render("single:" + str(round(single_time, 6)) + "sec", True, (255, 255, 255))
+        total = textfont.render("total:" + str(round(total_time, 6)) + "sec", True, (255, 255, 255))
+        self.screen.blit(single, (200 + 1, 950 + 1))
+        self.screen.blit(total, (450 + 1, 950 + 1))
+        pygame.display.flip()
 
     def board(self, arr, player):
-        # # 刷新界面函数
-        # def update():
-        #     for i in range(8):
-        #         for j in range(8):
-        #             chess_color = arr[self.from2Dto1D(i, j)]
-        #             if chess_color == 1:
-        #                 pygame.draw.rect(self.screen, self.black, ((j * 100 + 1, i * 100 + 1), (99, 99)))
-        #             if chess_color == 2:
-        #                 pygame.draw.rect(self.screen, self.white, ((j * 100 + 1, i * 100 + 1), (99, 99)))
-        #
-        # # 游戏状态，0表示未分胜负，-1表示个人胜利，1表示电脑获胜
-        # judge = 0
-        # while not judge:
-        #     update()
-        #     if self.isEnd(arr):
-        #         judge = 1
-        #     # 感应事件
-        #     for event in pygame.event.get():
-        #         # 点击关闭窗口，退出游戏
-        #         # if event.type == pygame.MOUSEBUTTONDOWN:
-        #         #     sys.exit()
-        #         if event.type == pygame.QUIT:
-        #             judge = 1
-        #     # 将渲染的界面显示
-        #     pygame.display.flip()
-        # if player == 1:
-        #     time.sleep(1)
-        # time.sleep(2)
+
+        cnt_black = 0
+        cnt_white = 0
+        for i in self.arr:
+            if i == 1:
+                cnt_black += 1
+            elif i == 2:
+                cnt_white += 1
+        textfont = pygame.font.SysFont(None, 30)
+        black = textfont.render("black: " + str(cnt_black), True, self.black)
+        white = textfont.render("white: " + str(cnt_white), True, self.white)
+        self.screen.blit(black, (100 + 1, 900 + 1))
+        self.screen.blit(white, (600 + 1, 900 + 1))
         for i in range(8):
             for j in range(8):
                 chess_color = self.arr[self.from2Dto1D(i, j)]
                 if chess_color == 1:
                     pygame.draw.rect(self.screen, self.black, ((j * 100 + 1, i * 100 + 1), (99, 99)))
                 if chess_color == 2:
-                    pygame.draw.rect(self.screen, self.white, ((j * 100 + 1, i * 100 + 1), (99, 99)))
+                    pygame.draw.rect(self.screen, self.white, ((j * 100 + 1, i * 100 + 1), (98, 98)))
         pygame.display.flip()
 
+    def train_c(self, n):
+        for i in range(n):
+            cnt_black_wins = 0
+            cnt_white_wins = 0
+            for j in range(100):
+                self.run()
+                if self.winner_train == self.BLACK:
+                    cnt_black_wins += 1
+                else:
+                    cnt_white_wins += 1
+            if cnt_black_wins > cnt_white_wins:
+                self.c_train[self.WHITE] = (self.c_train[self.BLACK] + self.c_train[self.WHITE]) / 2
+            else:
+                self.c_train[self.BLACK] = (self.c_train[self.BLACK] + self.c_train[self.WHITE]) / 2
+
     def mainActivity(self):
-        # 加载字体
-        textFont = pygame.font.SysFont(None, 50)
-        textSurface = textFont.render("AI vs AI", True, (255, 255, 255))
-        textSurface_1 = textFont.render("AI vs Player", True, (255, 255, 255))
-        self.screen.blit(textSurface, (130 + 1, 875 + 1))
-        self.screen.blit(textSurface_1, (502 + 1, 875 + 1))
-        # pygame.draw.rect(self.screen, self.black, ((100 + 1, 850 + 1), (200, 100)), 1)
-        # pygame.draw.rect(self.screen, self.black, ((500 + 1, 850 + 1), (200, 100)), 1)
-        pygame.display.flip()
+        self.initializeBoard()
         judge = 0
         while not judge:
             # quit playing
@@ -755,10 +825,29 @@ class MCTS(object):
                     print(x, y)  # 当前在屏幕中的坐标
                     if 100 < x < 300 and 850 < y < 950:
                         if not self.run():
-                            judge = 1
+                            return False
+                        judge_1 = 0
+                        while not judge_1:
+                            for e in pygame.event.get():
+                                if e.type == pygame.MOUSEBUTTONDOWN:
+                                    self.initializeBoard()
+                                    judge_1 = 1
+                                if e.type == pygame.QUIT:
+                                    judge_1 = 1
+                                    judge = 1
                     if 500 < x < 700 and 850 < y < 950:
                         if not self.playerVsAI():
-                            judge = 1
+                            return False
+                        judge_1 = 0
+                        while not judge_1:
+                            for e in pygame.event.get():
+                                if e.type == pygame.MOUSEBUTTONDOWN:
+                                    self.initializeBoard()
+                                    judge_1 = 1
+                                if e.type == pygame.QUIT:
+                                    judge_1 = 1
+                                    judge = 1
+
             # [col, row] = self.get2DPosition()
             # cur_pos = self.from2Dto1D(row, col)
             # if self.check_step_valid(self.arr, cur_pos, player):
